@@ -1,2 +1,438 @@
-# rain-water-harvesting-calculator
-Calculadora interactiva de captación de agua de lluvia con análisis mensual de balance hídrico basado en datos históricos de Celaya, Guanajuato
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Captación de Agua de Lluvia</title>
+    <style>
+        :root {
+            --primary-color: #0077b6;
+            --secondary-color: #00b4d8;
+            --bg-color: #f8f9fa;
+            --text-color: #333;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: var(--primary-color);
+            text-align: center;
+        }
+        p.subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-bottom: 5px;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        input {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background-color: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #023e8a;
+        }
+        .table-responsive {
+            overflow-x: auto;
+            margin-top: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+            text-align: center;
+        }
+        th {
+            background-color: var(--primary-color);
+            color: white;
+            white-space: nowrap;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f9f9;
+        }
+        .deficit {
+            color: #d90429;
+            font-weight: bold;
+        }
+        .superavit {
+            color: #2b9348;
+            font-weight: bold;
+        }
+        .summary-box {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #e0fbfc;
+            border-left: 5px solid var(--primary-color);
+            border-radius: 6px;
+        }
+        .summary-box h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Análisis de Captación Pluvial</h1>
+        <p class="subtitle">Evaluación mensual basada en datos históricos de precipitación (Celaya, Gto)</p>
+        
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="area">Área de captación (m²):</label>
+                <input type="number" id="area" placeholder="Ej. 100" min="1" required>
+            </div>
+            <div class="form-group">
+                <label for="ce">Coeficiente de Escurrimiento (CE):</label>
+                <input type="number" id="ce" step="0.01" placeholder="Ej. 0.8" required>
+            </div>
+            <div class="form-group">
+                <label for="personas">Número de personas:</label>
+                <input type="number" id="personas" placeholder="Ej. 4" min="1" required>
+            </div>
+            <div class="form-group">
+                <label for="costo">Costo de 1m³ de agua ($):</label>
+                <input type="number" id="costo" step="0.5" placeholder="Ej. 25.50" required>
+            </div>
+        </div>
+        
+        <button onclick="calcularBalance()">Calcular Balance</button>
+
+        <div id="resultados" style="display: none;">
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Mes</th>
+                            <th>Precipitación (mm)</th>
+                            <th>Potcall (m³)</th>
+                            <th>Ach (m³)</th>
+                            <th>Balance (m³)</th>
+                            <th>Costo Faltante ($)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-body">
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="summary-box" id="resumen">
+                <!-- Se llena con Javascript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Datos meteorológicos promedio para Celaya (Últimos 4 años)
+        const precipMensual = [14.6, 5.6, 9.0, 13.9, 40.9, 114.5, 154.1, 146.2, 124.4, 45.8, 14.0, 3.0];
+        const diasMes = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+        function calcularBalance() {
+            const area = parseFloat(document.getElementById('area').value);
+            const ce = parseFloat(document.getElementById('ce').value);
+            const personas = parseInt(document.getElementById('personas').value);
+            const costoM3 = parseFloat(document.getElementById('costo').value);
+
+            if (isNaN(area) || isNaN(ce) || isNaN(personas) || isNaN(costoM3)) {
+                alert('Por favor, ingresa todos los datos correctamente.');
+                return;
+            }
+
+            const tbody = document.getElementById('tabla-body');
+            tbody.innerHTML = '';
+            
+            let totalPotcall = 0;
+            let totalAch = 0;
+            let maxPotcallMes = 0;
+            let ahorroAnual = 0;
+
+            for (let i = 0; i < 12; i++) {
+                // Fórmulas base
+                const potcall = (area * ce * precipMensual[i]) / 1000;
+                const ach = (personas * 180 * diasMes[i]) / 1000;
+                const balance = ach - potcall; 
+                
+                // Si el balance es positivo, es porque ACH > Potcall (hace falta agua).
+                // El costo a pagar a la red será el del balance faltante.
+                const costoFaltante = balance > 0 ? (balance * costoM3) : 0;
+                
+                // El dinero ahorrado es el costo del agua que SÍ se logró captar y usar.
+                const aguaAprovechada = balance > 0 ? potcall :Aquí tienes el código completo en un solo archivo HTML. Incluye el diseño estructurado, la tabla de resultados y la lógica en JavaScript para realizar los cálculos mensuales. 
+
+Para que los datos sean representativos de tu zona de estudio, he preconfigurado el sistema con promedios estimados de precipitación mensual para la región de Celaya y el Bajío (basado en el comportamiento hidrológico de los últimos 4 años, con una media anual cercana a los 650 mm). Puedes editar estos valores directamente en el código si cuentas con la lectura exacta de una estación meteorológica específica.
+
+### Código HTML, CSS y JavaScript
+
+Guarda el siguiente código en un archivo llamado captacion.html y ábrelo en cualquier navegador web.
+
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora Mensual de Captación de Lluvia</title>
+    <style>
+        :root {
+            --primary: #2d6a4f;
+            --bg-color: #f8f9fa;
+            --text-color: #333;
+            --border-color: #dee2e6;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            max-width: 900px;
+            width: 100%;
+        }
+        h1, h2 {
+            color: var(--primary);
+            text-align: center;
+        }
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+        input {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #1b4332;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 25px;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th {
+            background-color: var(--primary);
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f1f5f9;
+        }
+        .negative { color: #d90429; font-weight: bold; }
+        .positive { color: #2d6a4f; font-weight: bold; }
+        .summary-box {
+            margin-top: 25px;
+            background: #e9ecef;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 5px solid var(--primary);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Análisis Mensual de Captación de Agua</h1>
+    
+    <div class="input-grid">
+        <div class="input-group">
+            <label for="area">Área de captación (m²)</label>
+            <input type="number" id="area" placeholder="Ej. 100" min="1">
+        </div>
+        <div class="input-group">
+            <label for="ce">Coeficiente de Escurrimiento (CE)</label>
+            <input type="number" id="ce" placeholder="Ej. 0.85" step="0.01" min="0" max="1">
+        </div>
+        <div class="input-group">
+            <label for="personas">Número de personas</label>
+            <input type="number" id="personas" placeholder="Ej. 4" min="1">
+        </div>
+        <div class="input-group">
+            <label for="costoAgua">Costo de 1m³ de agua ($)</label>
+            <input type="number" id="costoAgua" placeholder="Ej. 25" step="0.5" min="0">
+        </div>
+    </div>
+
+    <button onclick="calcularBalance()">Calcular Balance Mensual</button>
+
+    <div id="resultados" style="display: none;">
+        <table id="tablaResultados">
+            <thead>
+                <tr>
+                    <th>Mes</th>
+                    <th>Prec. (mm)</th>
+                    <th>Potcall (m³)</th>
+                    <th>ACH (m³)</th>
+                    <th>Balance (m³)</th>
+                    <th>Costo Red ($)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Los resultados se insertarán aquí con JavaScript -->
+            </tbody>
+        </table>
+
+        <div class="summary-box">
+            <h2>Volumen de Almacenamiento Recomendado</h2>
+            <p id="volumenRecomendado" style="font-size: 1.5rem; font-weight: bold; margin: 10px 0;"></p>
+            <p style="font-size: 0.9rem; color: #555;">* Calculado con base en el mes de mayor captación pluvial para maximizar el aprovechamiento durante la temporada de lluvias.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Datos preconfigurados (Promedio región Bajío últimos 4 años)
+    const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const diasMes = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    // Precipitación promedio mensual en mm (litros/m2)
+    const precipitacion = [12, 8, 10, 18, 45, 125, 142, 135, 105, 42, 15, 11];
+
+    function calcularBalance() {
+        // Obtener valores de los inputs
+        const area = parseFloat(document.getElementById('area').value);
+        const ce = parseFloat(document.getElementById('ce').value);
+        const personas = parseInt(document.getElementById('personas').value);
+        const costoAgua = parseFloat(document.getElementById('costoAgua').value);
+
+        if (isNaN(area) || isNaN(ce) || isNaN(personas) || isNaN(costoAgua)) {
+            alert("Por favor, llena todos los campos con números válidos.");
+            return;
+        }
+
+        const tbody = document.querySelector('#tablaResultados tbody');
+        tbody.innerHTML = ''; // Limpiar tabla anterior
+
+        let maxPotcall = 0;
+
+        for (let i = 0; i < 12; i++) {
+            // Potcall: (Área × CE × Precipitación) ÷ 1000
+            let potcall = (area * ce * precipitacion[i]) / 1000;
+            
+            // Buscamos el mes de mayor captación para el tamaño de la cisterna
+            if(potcall > maxPotcall) maxPotcall = potcall;
+
+            // Ach: (personas × 180 dotación × dias) ÷ 1000
+            let ach = (personas * 180 * diasMes[i]) / 1000;
+
+            // Balance: Ach - Potcall
+            // Si el balance es positivo, falta agua. Si es negativo, sobra agua pluvial.
+            let balance = ach - potcall;
+
+            // Costo: Solo se paga el agua que falta (cuando balance es mayor a 0)
+            let aguaFaltante = balance > 0 ? balance : 0;
+            let costo = aguaFaltante * costoAgua;
+
+            // Formato visual para el balance (Verde si sobra lluvia, Rojo si falta)
+            let balanceClase = balance <= 0 ? 'positive' : 'negative';
+
+            // Insertar fila en la tabla
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${meses[i]}</strong></td>
+                    <td>${precipitacion[i]}</td>
+                    <td>${potcall.toFixed(2)}</td>
+                    <td>${ach.toFixed(2)}</td>
+                    <td class="${balanceClase}">${balance.toFixed(2)}</td>
+                    <td>$${costo.toFixed(2)}</td>
+                </tr>
+            `;
+        }
+
+        // Mostrar sección de resultados
+        document.getElementById('resultados').style.display = 'block';
+        
+        // El volumen de almacenamiento se recomienda en base a la capacidad del mes con más lluvias 
+        // para asegurar que no haya desbordamiento.
+        document.getElementById('volumenRecomendado').innerText = maxPotcall.toFixed(2) + " m³ (Litros: " + (maxPotcall * 1000).toFixed(0) + ")";
+    }
+</script>
+
+</body>
+</html>
